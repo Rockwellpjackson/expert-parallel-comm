@@ -1,0 +1,6 @@
+*.so
+*.o
+__pycache__/
+*.pyc
+*.nsys-rep
+*.ncu-rep
