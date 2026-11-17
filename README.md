@@ -67,6 +67,33 @@ GPU 0 owns `lane[src 0]` on every GPU, including its own, and GPU 1 owns
 - [ ] Combine (the return path that gathers weighted expert outputs)
 - [ ] Benchmarks across batch sizes and GPU counts
 
+## Comparison
+
+We compare against a minimal NCCL baseline (`naive_nccl_dispatch.cu`). It uses
+the same scatter kernel and output layout as the fused version, but writes into
+local buffers and moves them with NCCL: a count exchange, a host sync to read the
+counts, and then grouped `ncclSend`/`ncclRecv` calls for the payload and metadata.
+Because the GPU-side work is the same, the gap comes mostly from how data is
+transferred and how the two sides synchronize.
+
+In initial results, the fused dispatch is about **4× faster for small decode
+batches** and **1.5× faster for large prefill batches**:
+
+| Workload                    | Fused    | NCCL baseline | Speedup  |
+|-----------------------------|---------:|--------------:|---------:|
+| Decode, T=1–8, H=2k/6k      | 25–31 µs | 98–118 µs     | 3.4–4.3× |
+| Prefill, T=20k, K=5, H=2k   | 4.74 ms  | 7.26 ms       | 1.5×     |
+| Prefill, T=20k, K=5, H=6k   | 14.08 ms | 21.49 ms      | 1.5×     |
+
+T = tokens per GPU, K = experts per token (top-k), H = hidden size (floats per token).
+
+The largest speedup is at small batch sizes, as expected. There, NCCL's fixed
+per-call overhead and the host round trip make up most of the step time. At large
+batch sizes the transfer itself dominates, so the gap narrows.
+
+These numbers are preliminary. Benchmark and comparison scripts will be added soon.
+
+
 ## Prior art
 
 The idea is not new. [DeepEP](https://github.com/deepseek-ai/DeepEP) (DeepSeek)

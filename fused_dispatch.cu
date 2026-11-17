@@ -205,6 +205,9 @@ extern "C"
             for (int p = 0; p < n_ranks; p++) {
                 if(p == d) continue;
                 cudaError_t err = cudaDeviceEnablePeerAccess(p,0);
+                if(err == cudaErrorPeerAccessAlreadyEnabled) {
+                    cudaGetLastError();
+                }
                 if (err != cudaErrorPeerAccessAlreadyEnabled) {
                     check_cuda(err, "init: enable peer access");
                 }
